@@ -49,15 +49,15 @@ jobs:
                 terraform_version: 1.5.7
 
             - name: Terraform Init
-              run: terraform init -backend-config=environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.backend.conf
+              run: terraform init --reconfigure --backend-config="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.backend.conf"
 
             - name: Terraform Plan
-              id: tfplan
+              id: tf-plan
               run: |
                 export exit_code=0
-                terraform plan -var-file="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.tfvars" -detailed-exitcode -out tfplan || exit_code=$?
-                echo "exit_code=$exit_code" >> $GITHUB_ENV
-                if [ $exit_code -eq 1 ]; then
+                terraform plan -var-file="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.tfvars" -detailed-exitcode -no-colour -out tfplan || export exit_code=$?
+                echo "exitcode=$exitcode" >> $GITHUB_ENV
+                if [ $exitcode -eq 1 ]; then
                    echo Terraform plan failed!
                    exit 1
                    else
@@ -65,5 +65,5 @@ jobs:
                 fi
 
             - name: Terraform apply
-              if: github.event.inputs.Terraform_Action == 'apply' 
+              if: ${{github.event.inputs.Terraform_Action == 'apply' }}
               run: terraform apply -auto-approve -var-file="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.tfvars" 
