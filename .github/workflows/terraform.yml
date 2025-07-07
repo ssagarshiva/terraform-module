@@ -1,0 +1,69 @@
+name: 'Terraform'
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+        Environment:
+          type: choice
+          description: 'Environment to deploy to'
+          options:
+            - dev
+            - test
+
+        Terraform_Action:
+          type: choice
+          description: 'Terraform action to apply/destroy'
+          options:
+            - plan
+            - apply
+            - destroy
+          
+permissions:
+    contents: read
+    id-token: write
+    pull-requests: write
+    
+
+env: 
+    ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+    ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+    ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+    ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+
+jobs:
+    terraform-plan:
+        name: 'Terraform Plan'
+        runs-on: ubuntu-latest
+        environment: ${{ github.event.inputs.Environment }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Terraform
+              uses: hashicorp/setup-terraform@v1
+              with:
+                terraform_version: 1.5.7
+
+            - name: Terraform Init
+              run: terraform init -backend-config=environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.backend.conf
+
+            - name: Terraform Plan
+              id: tfplan
+              run: |
+                export exit_code=0
+                terraform plan -var-file="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.tfvars" -detailed-exitcode -out tfplan || exit_code=$?
+                echo "exit_code=$exit_code" >> $GITHUB_ENV
+                if [ $exit_code -eq 1 ]; then
+                   echo Terraform plan failed!
+                   exit 1
+                   else
+                   exit 0
+                fi
+
+            - name: Terraform apply
+              if: github.event.inputs.Terraform_Action == 'apply' 
+              run: terraform apply -auto-approve -var-file="environment/${{ github.event.inputs.Environment }}/${{ github.event.inputs.Environment }}.tfvars" 
